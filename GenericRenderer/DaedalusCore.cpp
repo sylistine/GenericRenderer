@@ -15,6 +15,8 @@ namespace Daedalus
     VkPhysicalDevice gpu = VK_NULL_HANDLE;
     VkDevice device = VK_NULL_HANDLE;
 
+    inline bool success(VkResult res) { return res == VK_SUCCESS; }
+
     Result initialize()
     {
         if (instance != VK_NULL_HANDLE) {
@@ -25,12 +27,12 @@ namespace Daedalus
         // unavailable items in the enabled* vectors are considered required,
         // and available items in the optional* vectors will be pushed onto the enabled* vectors.
 
-        auto enabledLayers = std::vector<const char*>();
+        auto enabledLayers = List<cstr>();
 #if defined(_DEBUG)
         enabledLayers.push_back("VK_LAYER_KHRONOS_validation");
 #endif
 
-        auto enabledExtensions = std::vector<const char*>();
+        auto enabledExtensions = List<cstr>();
 #if defined(_DEBUG)
         enabledExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #endif
@@ -71,7 +73,7 @@ namespace Daedalus
         instanceCI.pNext = &debugUtilsMessengerCI;
 #endif
 
-        if (VK_SUCCESS != vkCreateInstance(&instanceCI, nullptr, &instance)) {
+        if (!success(vkCreateInstance(&instanceCI, nullptr, &instance))) {
             return Result::Failed;
         }
 
@@ -108,8 +110,8 @@ namespace Daedalus
         createInfo.hinstance = hInstance;
         createInfo.hwnd = hWnd;
 
-        if (VK_SUCCESS != vkCreateWin32SurfaceKHR(
-            instance, &createInfo, nullptr, &surface)) {
+        if (!success(vkCreateWin32SurfaceKHR(
+            instance, &createInfo, nullptr, &surface))) {
             OutputDebugString(L"Daedalus: failed to create a Win32 Surface.\n");
             return Result::Failed;
         }
@@ -118,28 +120,10 @@ namespace Daedalus
     }
 #endif
 
-    inline std::vector<VkPhysicalDevice> getPhysicalDevices(VkInstance instance)
-    {
-        uint32_t gpuCount;
-        vkEnumeratePhysicalDevices(instance, &gpuCount, nullptr);
-        auto gpus = std::vector<VkPhysicalDevice>(gpuCount);
-        vkEnumeratePhysicalDevices(instance, &gpuCount, gpus.data());
-        return gpus;
-    }
-
-    inline std::vector<VkQueueFamilyProperties> getPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice gpu)
-    {
-        uint32_t propertyCount;
-        vkGetPhysicalDeviceQueueFamilyProperties(gpu, &propertyCount, nullptr);
-        std::vector<VkQueueFamilyProperties> properties(propertyCount);
-        vkGetPhysicalDeviceQueueFamilyProperties(gpu, &propertyCount, properties.data());
-        return properties;
-    }
-
     Result createDevice()
     {
-        auto gpus = getPhysicalDevices(instance);
-        auto surfaceSupportedGPUs = std::vector<VkPhysicalDevice>();
+        auto gpus = VkUtil::GetPhysicalDevices(instance);
+        auto surfaceSupportedGPUs = List<VkPhysicalDevice>();
 
         for (auto& gpu : gpus) {
             auto capabilities = VkSurfaceCapabilitiesKHR{};
@@ -157,7 +141,7 @@ namespace Daedalus
                 continue;
             }
 
-            auto queueFamilyProperties = getPhysicalDeviceQueueFamilyProperties(gpu);
+            auto queueFamilyProperties = VkUtil::GetPhysicalDeviceQueueFamilyProperties(gpu);
 
             surfaceSupportedGPUs.push_back(gpu);
         }
@@ -173,17 +157,16 @@ namespace Daedalus
         auto supportedLayers = VkUtil::GetSupportedDeviceLayers(gpu);
         auto supportedExtensions = VkUtil::GetSupportedDeviceExtensions(gpu);
 
-        auto queueCreateInfos = std::vector<VkDeviceQueueCreateInfo>();
+        auto queueCreateInfos = List<VkDeviceQueueCreateInfo>();
         queueCreateInfos.push_back(VkStruct::DeviceQueueCreateInfo());
-        
 
         auto deviceFeatures = VkPhysicalDeviceFeatures{};
 
-        auto enabledLayers = std::vector<const char*>();
-        auto optionalLayers = std::vector<const char*>();
+        auto enabledLayers = List<cstr>();
+        auto optionalLayers = List<cstr>();
 
-        auto enabledExtensions = std::vector<const char*>();
-        auto optionalExtensions = std::vector<const char*>();
+        auto enabledExtensions = List<cstr>();
+        auto optionalExtensions = List<cstr>();
         // Core rendering feature.
         enabledExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
         // Variable rate shading
@@ -279,8 +262,7 @@ namespace Daedalus
         deviceCI.ppEnabledExtensionNames = enabledExtensions.data();
         deviceCI.pEnabledFeatures = &deviceFeatures;
 
-        if (VK_SUCCESS != vkCreateDevice(
-            gpu, &deviceCI, nullptr, &device))
+        if (!success(vkCreateDevice(gpu, &deviceCI, nullptr, &device)))
         {
             OutputDebugString(L"Failed to create a device.\n");
             return Result::Failed;

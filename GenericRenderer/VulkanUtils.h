@@ -6,39 +6,65 @@
 
 namespace VkUtil
 {
-    inline std::vector<VkLayerProperties> GetSuppportedInstanceLayers()
+    inline List<VkLayerProperties> GetSuppportedInstanceLayers()
     {
-        uint32_t propertyCount;
-        vkEnumerateInstanceLayerProperties(&propertyCount, nullptr);
-        auto properties = std::vector<VkLayerProperties>(propertyCount);
-        vkEnumerateInstanceLayerProperties(&propertyCount, properties.data());
-        return properties;
+        u32 propCount;
+        vkEnumerateInstanceLayerProperties(&propCount, nullptr);
+        auto props = List<VkLayerProperties>(propCount);
+        vkEnumerateInstanceLayerProperties(&propCount, props.data());
+        return props;
     }
 
-    inline std::vector<VkExtensionProperties> GetSupportedInstanceExtensions(const char* layer = nullptr)
+    inline List<VkExtensionProperties> GetSupportedInstanceExtensions(
+        cstr layer = nullptr)
     {
-        uint32_t propertyCount;
-        vkEnumerateInstanceExtensionProperties(layer, &propertyCount, nullptr);
-        auto properties = std::vector<VkExtensionProperties>(propertyCount);
-        vkEnumerateInstanceExtensionProperties(layer, &propertyCount, properties.data());
-        return properties;
+        u32 propCount;
+        vkEnumerateInstanceExtensionProperties(layer, &propCount, nullptr);
+        auto props = List<VkExtensionProperties>(propCount);
+        vkEnumerateInstanceExtensionProperties(layer, &propCount, props.data());
+        return props;
     }
 
-    inline std::vector<VkLayerProperties> GetSupportedDeviceLayers(VkPhysicalDevice device)
+    inline List<VkLayerProperties> GetSupportedDeviceLayers(
+        VkPhysicalDevice device)
     {
-        uint32_t propertyCount;
-        vkEnumerateDeviceLayerProperties(device, &propertyCount, nullptr);
-        auto properties = std::vector<VkLayerProperties>(propertyCount);
-        vkEnumerateDeviceLayerProperties(device, &propertyCount, properties.data());
-        return properties;
+        u32 propCount;
+        vkEnumerateDeviceLayerProperties(device, &propCount, nullptr);
+        auto props = List<VkLayerProperties>(propCount);
+        vkEnumerateDeviceLayerProperties(device, &propCount, props.data());
+        return props;
     }
 
-    inline std::vector<VkExtensionProperties> GetSupportedDeviceExtensions(VkPhysicalDevice device, const char* layer = nullptr)
+    inline List<VkExtensionProperties> GetSupportedDeviceExtensions(
+        VkPhysicalDevice device,
+        const char* layer = nullptr)
     {
-        uint32_t propertyCount;
-        vkEnumerateDeviceExtensionProperties(device, layer, &propertyCount, nullptr);
-        auto properties = std::vector<VkExtensionProperties>(propertyCount);
-        vkEnumerateDeviceExtensionProperties(device, layer, &propertyCount, properties.data());
+        u32 propCount;
+        vkEnumerateDeviceExtensionProperties(device, layer, &propCount, nullptr);
+        auto props = List<VkExtensionProperties>(propCount);
+        vkEnumerateDeviceExtensionProperties(device, layer, &propCount, props.data());
+        return props;
+    }
+
+    inline List<VkPhysicalDevice> GetPhysicalDevices(VkInstance instance)
+    {
+        u32 gpuCount;
+        vkEnumeratePhysicalDevices(
+            instance, &gpuCount, nullptr);
+        auto gpus = List<VkPhysicalDevice>(gpuCount);
+        vkEnumeratePhysicalDevices(
+            instance, &gpuCount, gpus.data());
+        return gpus;
+    }
+
+    inline List<VkQueueFamilyProperties> GetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice gpu)
+    {
+        u32 propertyCount;
+        vkGetPhysicalDeviceQueueFamilyProperties(
+            gpu, &propertyCount, nullptr);
+        List<VkQueueFamilyProperties> properties(propertyCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(
+            gpu, &propertyCount, properties.data());
         return properties;
     }
 }

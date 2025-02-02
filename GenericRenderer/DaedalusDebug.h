@@ -37,7 +37,7 @@ namespace Debug
         createInfo.pfnUserCallback = debugLogger;
         return createInfo;
     }
-    inline const char* translateSeverityFlagBits(VkDebugUtilsMessageSeverityFlagBitsEXT bits)
+    inline cstr translateSeverityFlagBits(VkDebugUtilsMessageSeverityFlagBitsEXT bits)
     {
         switch (bits) {
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
@@ -52,7 +52,7 @@ namespace Debug
             return "?";
         }
     }
-    inline const char* translateTypeFlags(VkDebugUtilsMessageTypeFlagsEXT flags)
+    inline cstr translateTypeFlags(VkDebugUtilsMessageTypeFlagsEXT flags)
     {
         switch (flags) {
         case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT:
@@ -67,15 +67,15 @@ namespace Debug
             return "Unknown Message Type";
         }
     }
-    inline const char* translateObjectType(VkObjectType type)
+    inline cstr translateObjectType(VkObjectType type)
     {
         switch (type) {
 
         }
     }
-    std::string itoa(uint64_t i, uint16_t b = 10)
+    String itoa(u64 i, u16 b = 10)
     {
-        auto str = std::string("");
+        auto str = String("");
 
         const int numstart = '0';
         const int majstart = 'A';
@@ -83,27 +83,27 @@ namespace Debug
         while (i > 0) {
             auto v = i % b;
             auto out = v > 9 ? (char)(minstart + (v-10)) : (char)(numstart + v);
-            str = std::string(1,out) + str;
+            str = String(1,out) + str;
 
             i /= b;
         }
 
         return str;
     }
-    std::string itoa(uint32_t i, uint16_t b = 10)
+    String itoa(u32 i, u16 b = 10)
     {
         return itoa(i, b);
     }
-    std::string itoa(uint16_t i, uint16_t b = 10)
+    String itoa(u16 i, u16 b = 10)
     {
         return itoa(i, b);
     }
-    std::string itoa(int32_t i, uint16_t b = 10)
+    String itoa(i32 i, u16 b = 10)
     {
         if (i < 0) {
-            return std::string(1, '-') + itoa((uint64_t)(- 1 * i), b);
+            return String(1, '-') + itoa((u64)(- 1 * i), b);
         } else {
-            return itoa((uint64_t)i, b);
+            return itoa((u64)i, b);
         }
     }
 
