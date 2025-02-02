@@ -37,7 +37,7 @@ namespace VkUtil
 
     inline List<VkExtensionProperties> GetSupportedDeviceExtensions(
         VkPhysicalDevice device,
-        const char* layer = nullptr)
+        cstr layer = nullptr)
     {
         u32 propCount;
         vkEnumerateDeviceExtensionProperties(device, layer, &propCount, nullptr);
