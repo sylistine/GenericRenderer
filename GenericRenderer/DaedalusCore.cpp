@@ -5,17 +5,16 @@
 #include "DaedalusDebug.h"
 #endif
 
-#include <vulkan/vulkan.h>
-#include "VulkanUtils.h"
+//#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
 
 namespace Daedalus
 {
-    VkInstance instance = VK_NULL_HANDLE;
-    VkSurfaceKHR surface = VK_NULL_HANDLE;
-    VkPhysicalDevice gpu = VK_NULL_HANDLE;
-    VkDevice device = VK_NULL_HANDLE;
+    vk::Instance instance = VK_NULL_HANDLE;
+    vk::SurfaceKHR surface = VK_NULL_HANDLE;
+    vk::Device device = VK_NULL_HANDLE;
 
-    inline bool success(VkResult res) { return res == VK_SUCCESS; }
+    inline bool success(vk::Result res) { return res == vk::Result::eSuccess; }
 
     Result initialize()
     {
@@ -29,43 +28,44 @@ namespace Daedalus
 
         auto enabledLayers = List<cstr>();
 #if defined(_DEBUG)
-        enabledLayers.push_back("VK_LAYER_KHRONOS_validation");
+        auto validationLayer = String("VK_LAYER_KHRONOS_validation");
+        enabledLayers.push_back(validationLayer.c_str());
 #endif
 
-        auto enabledExtensions = List<cstr>();
+        auto enabledExts = List<cstr>();
 #if defined(_DEBUG)
-        enabledExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        enabledExts.push_back(vk::EXTDebugUtilsExtensionName);
 #endif
 #if defined(_WINDOWS)
-        enabledExtensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+        enabledExts.push_back(vk::KHRWin32SurfaceExtensionName);
 #endif
 #if defined(_SPATIAL)
         extensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
 #endif
-        enabledExtensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
-        enabledExtensions.push_back(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
+        enabledExts.push_back(vk::KHRSurfaceExtensionName);
+        enabledExts.push_back(vk::KHRGetSurfaceCapabilities2ExtensionName);
         // Should be obsoleted with vulkan api version 1.1
-        enabledExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+        enabledExts.push_back(vk::KHRGetPhysicalDeviceProperties2ExtensionName);
         //enabledExtensions.push_back(VK_KHR_GET_DISPLAY_PROPERTIES_2_EXTENSION_NAME);
         //enabledExtensions.push_back(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
 
-        auto supportedLayers = VkUtil::GetSuppportedInstanceLayers();
-        auto supportedExtensions = VkUtil::GetSupportedInstanceExtensions();
-        auto supportedKHRONOSVALIDATIONExts = VkUtil::GetSupportedInstanceExtensions("VK_LAYER_KHRONOS_validation");
+        auto supportedLayers = vk::enumerateInstanceLayerProperties();
+        auto supportedExtensions = vk::enumerateInstanceExtensionProperties();
+        auto supportedKhronosExts = vk::enumerateInstanceExtensionProperties(validationLayer);
 
-        auto appInfo = VkStruct::ApplicationInfo();
+        auto appInfo = vk::ApplicationInfo();
         appInfo.pEngineName = "Generic Renderer";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pApplicationName = "Generic Renderer";
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.apiVersion = VK_API_VERSION_1_3;
 
-        auto instanceCI = VkStruct::InstanceCreateInfo();
+        auto instanceCI = vk::InstanceCreateInfo();
         instanceCI.pApplicationInfo = &appInfo;
         instanceCI.enabledLayerCount = enabledLayers.size();
         instanceCI.ppEnabledLayerNames = enabledLayers.data();
-        instanceCI.enabledExtensionCount = enabledExtensions.size();
-        instanceCI.ppEnabledExtensionNames = enabledExtensions.data();
+        instanceCI.enabledExtensionCount = enabledExts.size();
+        instanceCI.ppEnabledExtensionNames = enabledExts.data();
 
 #if defined(_DEBUG)
         auto debugUtilsMessengerCI = Debug::getDebugMessengerCreateInfo();
@@ -73,9 +73,7 @@ namespace Daedalus
         instanceCI.pNext = &debugUtilsMessengerCI;
 #endif
 
-        if (!success(vkCreateInstance(&instanceCI, nullptr, &instance))) {
-            return Result::Failed;
-        }
+        instance = vk::createInstance(instanceCI);
 
 #if defined(_DEBUG)
         Debug::setup(instance);
@@ -87,14 +85,14 @@ namespace Daedalus
     Result terminate()
     {
         if (device != VK_NULL_HANDLE) {
-            vkDestroyDevice(device, nullptr);
+            device.destroy();
         }
         if (surface != VK_NULL_HANDLE) {
-            vkDestroySurfaceKHR(instance, surface, nullptr);
+            instance.destroy(surface);
         }
         if (instance != VK_NULL_HANDLE) {
             Debug::cleanup(instance);
-            vkDestroyInstance(instance, nullptr);
+            instance.destroy();
         }
 
         return Result::Success;
@@ -105,62 +103,110 @@ namespace Daedalus
 #if defined(_WINDOWS)
     Result createSurface(HINSTANCE hInstance, HWND hWnd)
     {
-        VkWin32SurfaceCreateInfoKHR createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+        auto createInfo = vk::Win32SurfaceCreateInfoKHR();
         createInfo.hinstance = hInstance;
         createInfo.hwnd = hWnd;
-
-        if (!success(vkCreateWin32SurfaceKHR(
-            instance, &createInfo, nullptr, &surface))) {
-            OutputDebugString(L"Daedalus: failed to create a Win32 Surface.\n");
-            return Result::Failed;
-        }
+        surface = instance.createWin32SurfaceKHR(createInfo);
 
         return createDevice();
     }
 #endif
 
+    struct GPUInfo
+    {
+        vk::PhysicalDevice gpu;
+        bool isDiscrete = false;
+        u32 graphicsFamilyIdx = UINT32_MAX;
+        u32 presentFamilyIdx = UINT32_MAX;
+        u32 transferFamilyIdx = UINT32_MAX;
+    };
+
     Result createDevice()
     {
-        auto gpus = VkUtil::GetPhysicalDevices(instance);
-        auto surfaceSupportedGPUs = List<VkPhysicalDevice>();
+        auto gpus = instance.enumeratePhysicalDevices();
 
-        for (auto& gpu : gpus) {
-            auto capabilities = VkSurfaceCapabilitiesKHR{};
-            if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &capabilities) != VK_SUCCESS) {
-                // physical device and surface are not sympatico
+        auto gpuInfos = List<GPUInfo>();
+        // Acquire a GPU with both present and graphics capabilities.
+        // If multiple GPUs support graphics and present, select:
+        //physicalDeviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu;
+        for (auto gpu : gpus) {
+            auto info = GPUInfo();
+            info.gpu = gpu;
+
+            auto queueFamilyProperties = gpu.getQueueFamilyProperties();
+            auto properties = gpu.getProperties();
+
+            info.isDiscrete = properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu;
+
+            List<vk::Bool32> supportsPresent(queueFamilyProperties.size());
+            for (auto i = 0; i < queueFamilyProperties.size(); i++) {
+                supportsPresent[i] = gpu.getSurfaceSupportKHR(i, surface);
+                if (info.presentFamilyIdx == UINT32_MAX && supportsPresent[i]) {
+                    info.presentFamilyIdx = i;
+                }
+            }
+            // For now, like with most Vulkan samples, we'll try to get a family
+            // that supports both graphics and present.
+            // Later, we might also pick a queue that can focus exclusively on
+            // transfer operations for moving local<->device data.
+            for (auto i = 0; i < queueFamilyProperties.size(); i++) {
+                auto& family = queueFamilyProperties[i];
+                if (family.queueFlags & vk::QueueFlagBits::eGraphics) {
+                    if (supportsPresent[i]) {
+                        info.graphicsFamilyIdx = i;
+                        info.presentFamilyIdx = i;
+                        break;
+                    } else if (info.graphicsFamilyIdx == UINT32_MAX) {
+                        info.graphicsFamilyIdx = i;
+                    }
+                }
+            }
+            if (info.graphicsFamilyIdx == UINT32_MAX ||
+                info.presentFamilyIdx == UINT32_MAX) {
                 continue;
             }
-            auto physicalDeviceProperties = VkPhysicalDeviceProperties{};
-            vkGetPhysicalDeviceProperties(gpu, &physicalDeviceProperties);
-
-            auto supported = true;
-            // test against gpu properties and surface capabilities with this gpu.
-            // requirements: ?
-            if (!supported) {
-                continue;
-            }
-
-            auto queueFamilyProperties = VkUtil::GetPhysicalDeviceQueueFamilyProperties(gpu);
-
-            surfaceSupportedGPUs.push_back(gpu);
+            gpuInfos.push_back(info);
         }
-
-        if (surfaceSupportedGPUs.size() == 0) {
-            OutputDebugString(L"Unable to find a supported GPU.");
+        if (gpuInfos.size() < 1) {
+            OutputDebugString(L"Unable to find a GPU with graphics and present capabilities.");
             return Result::Failed;
         }
 
+        // We could use this list to present a set of options to the user.
+        auto gpuIdx = 0;
+        auto idealGPUFound = false;
+        for (auto i = 0; i < gpuInfos.size(); i++) {
+            if (gpuInfos[i].graphicsFamilyIdx == gpuInfos[i].presentFamilyIdx &&
+                gpuInfos[i].isDiscrete) {
+                gpuIdx = i;
+                idealGPUFound = true;
+                break;
+            }
+        }
+        if (!idealGPUFound) {
+            OutputDebugString(L"GPU is not ideal.");
+        }
+
         // Select a favored GPU or let the user decide.
-        gpu = surfaceSupportedGPUs[0];
+        auto supportedLayers = gpuInfos[gpuIdx].gpu.enumerateDeviceLayerProperties();
+        auto supportedExtensions = gpuInfos[gpuIdx].gpu.enumerateDeviceExtensionProperties();
 
-        auto supportedLayers = VkUtil::GetSupportedDeviceLayers(gpu);
-        auto supportedExtensions = VkUtil::GetSupportedDeviceExtensions(gpu);
+        auto queuePriorities = 0.0f;
+        auto queueCreateInfos = List<vk::DeviceQueueCreateInfo>();
+        auto graphicsQueueCI = vk::DeviceQueueCreateInfo();
+        graphicsQueueCI.queueFamilyIndex = gpuInfos[gpuIdx].graphicsFamilyIdx;
+        graphicsQueueCI.queueCount = 1;
+        graphicsQueueCI.pQueuePriorities = &queuePriorities;
+        queueCreateInfos.push_back(graphicsQueueCI);
+        if (gpuInfos[gpuIdx].graphicsFamilyIdx != gpuInfos[gpuIdx].presentFamilyIdx) {
+            auto presentQueueCI = vk::DeviceQueueCreateInfo();
+            presentQueueCI.queueFamilyIndex = gpuInfos[gpuIdx].presentFamilyIdx;
+            presentQueueCI.queueCount = 1;
+            presentQueueCI.pQueuePriorities = &queuePriorities;
+            queueCreateInfos.push_back(presentQueueCI);
+        }
 
-        auto queueCreateInfos = List<VkDeviceQueueCreateInfo>();
-        queueCreateInfos.push_back(VkStruct::DeviceQueueCreateInfo());
-
-        auto deviceFeatures = VkPhysicalDeviceFeatures{};
+        auto deviceFeatures = vk::PhysicalDeviceFeatures();
 
         auto enabledLayers = List<cstr>();
         auto optionalLayers = List<cstr>();
@@ -168,20 +214,20 @@ namespace Daedalus
         auto enabledExtensions = List<cstr>();
         auto optionalExtensions = List<cstr>();
         // Core rendering feature.
-        enabledExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+        enabledExtensions.push_back(vk::KHRSwapchainExtensionName);
         // Variable rate shading
-        optionalExtensions.push_back(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
+        optionalExtensions.push_back(vk::KHRFragmentShadingRateExtensionName);
         // Intended for optimization of Pipeline Cache compilation during an app's runtime.
-        optionalExtensions.push_back(VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_EXTENSION_NAME);
+        optionalExtensions.push_back(vk::EXTPipelineCreationCacheControlExtensionName);
         // Speeds up sequences of draw commands by loading them all and obviating state checks.
-        optionalExtensions.push_back(VK_EXT_MULTI_DRAW_EXTENSION_NAME);
+        optionalExtensions.push_back(vk::EXTMultiDrawExtensionName);
         // [Obsolete] This extension enables GPU culling
         //optionalExtensions.push_back(VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME);
         // This extension may help optimize framebuffer attachments that are also used as inputs.
         // Note: not available on 1 out of 1 nvidia gpus.
-        optionalExtensions.push_back(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME);
+        optionalExtensions.push_back(vk::EXTRasterizationOrderAttachmentAccessExtensionName);
         // For fun
-        optionalExtensions.push_back(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+        optionalExtensions.push_back(vk::EXTMeshShaderExtensionName);
 #if defined(_SPATIAL)
         // Core rendering feature in spatial applications.
         enabledExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
@@ -206,9 +252,6 @@ namespace Daedalus
 #if defined(_QCOM)
         // Provides tile information to the application. For... debugging?
         optionalExtensions.push_back(VK_QCOM_TILE_PROPERTIES_EXTENSION_NAME);
-#endif //_QCOM
-#endif // _MOBILE
-#if defined(_QCOM)
         // Allows custom logic when writing tiles out to shared memory.
         optionalExtensions.push_back(VK_QCOM_RENDER_PASS_SHADER_RESOLVE_EXTENSION_NAME);
         // Allows driver-level handling of image transform changes for performance.
@@ -220,7 +263,8 @@ namespace Daedalus
         // Perhaps enabling some kind of bloom or bokeh in a custom resolve shader?
         optionalExtensions.push_back(VK_QCOM_IMAGE_PROCESSING_EXTENSION_NAME);
         optionalExtensions.push_back(VK_QCOM_IMAGE_PROCESSING_2_EXTENSION_NAME);
-#endif // _QCOM
+#endif //_QCOM
+#endif // _MOBILE
 #if defined(_RAYTRACING)
         enabledExtensions.push_back(VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME);
         enabledExtensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
@@ -236,9 +280,9 @@ namespace Daedalus
 #endif // _RAYTRACING
 #if defined(_DEBUG)
         // Note: not available on 1 out of 1 nvidia gpus.
-        optionalExtensions.push_back(VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME);
+        optionalExtensions.push_back(vk::KHRPerformanceQueryExtensionName);
         // Note: not available on 1 out of 1 nvidia gpus.
-        optionalExtensions.push_back(VK_EXT_DEVICE_MEMORY_REPORT_EXTENSION_NAME);
+        optionalExtensions.push_back(vk::EXTDeviceMemoryReportExtensionName);
 #endif
 
         for (auto& eExt : enabledExtensions) {
@@ -253,7 +297,7 @@ namespace Daedalus
             }
         }
 
-        auto deviceCI = VkStruct::DeviceCreateInfo();
+        auto deviceCI = vk::DeviceCreateInfo();
         deviceCI.queueCreateInfoCount = queueCreateInfos.size();
         deviceCI.pQueueCreateInfos = queueCreateInfos.data();
         deviceCI.enabledLayerCount = enabledLayers.size();
@@ -262,11 +306,8 @@ namespace Daedalus
         deviceCI.ppEnabledExtensionNames = enabledExtensions.data();
         deviceCI.pEnabledFeatures = &deviceFeatures;
 
-        if (!success(vkCreateDevice(gpu, &deviceCI, nullptr, &device)))
-        {
-            OutputDebugString(L"Failed to create a device.\n");
-            return Result::Failed;
-        }
+        device = gpuInfos[gpuIdx].gpu.createDevice(deviceCI);
+
         return Result::Success;
     }
 } // namespace Daedalus

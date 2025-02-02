@@ -2,7 +2,7 @@
 
 #include "stdinc.h"
 
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
 
 namespace Daedalus
 {
@@ -67,12 +67,6 @@ namespace Debug
             return "Unknown Message Type";
         }
     }
-    inline cstr translateObjectType(VkObjectType type)
-    {
-        switch (type) {
-
-        }
-    }
     String itoa(u64 i, u16 b = 10)
     {
         auto str = String("");
@@ -107,7 +101,7 @@ namespace Debug
         }
     }
 
-    void setup(VkInstance instance)
+    void setup(vk::Instance instance)
     {
         createDebugMessenger = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
             instance, "vkCreateDebugUtilsMessengerEXT");
@@ -118,7 +112,7 @@ namespace Debug
         createDebugMessenger(instance, &createInfo, nullptr, &debugMessenger);
     }
 
-    void cleanup(VkInstance instance)
+    void cleanup(vk::Instance instance)
     {
         destroyDebugMessenger(instance, debugMessenger, nullptr);
     }
@@ -129,13 +123,13 @@ namespace Debug
         const VkDebugUtilsMessengerCallbackDataEXT* data,
         void* userData)
     {
-        auto tagPre = std::string("[");
-        auto tagPost = std::string("]");
+        auto tagPre = String("[");
+        auto tagPost = String("]");
 
-        auto prefix = std::string("Daedalus Vulkan Debug");
+        auto prefix = String("Daedalus Vulkan Debug");
 
-        auto severityLabel = std::string(translateSeverityFlagBits(severityFlag));
-        auto typeLabel = std::string(translateTypeFlags(typeFlags));
+        auto severityLabel = String(translateSeverityFlagBits(severityFlag));
+        auto typeLabel = String(translateTypeFlags(typeFlags));
 
 
         //auto labelPad = 16 - typeLabel.length();
@@ -145,6 +139,7 @@ namespace Debug
         
         if ((typeFlags & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) != 0) {
             msg += data->pMessage;
+            if (msg.back() != '\n') msg.push_back('\n');
         } else {
             msg += "[" + typeLabel + " | " + data->pMessageIdName + "] " +
                 data->pMessage + "\n";

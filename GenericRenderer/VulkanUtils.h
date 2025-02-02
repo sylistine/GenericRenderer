@@ -2,7 +2,8 @@
 
 #include "stdinc.h"
 
-#include <vulkan/vulkan.h>
+//#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
 
 namespace VkUtil
 {
