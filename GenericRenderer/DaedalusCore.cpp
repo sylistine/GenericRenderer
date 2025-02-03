@@ -5,7 +5,6 @@
 #include "DaedalusDebug.h"
 #endif
 
-//#include <vulkan/vulkan.h>
 #include <vulkan/vulkan.hpp>
 
 namespace Daedalus

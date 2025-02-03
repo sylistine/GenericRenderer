@@ -143,7 +143,6 @@
   <ItemGroup>
     <ClInclude Include="App.h" />
     <ClInclude Include="DaedalusDebug.h" />
-    <ClInclude Include="DaedalusVkClasses.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="GenericRenderer.h" />
     <ClInclude Include="Resource.h" />
@@ -154,7 +153,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="App.cpp" />
-    <ClCompile Include="DaedalusVkClasses.cpp" />
     <ClCompile Include="GenericRenderer.cpp" />
     <ClCompile Include="DaedalusCore.cpp" />
   </ItemGroup>
