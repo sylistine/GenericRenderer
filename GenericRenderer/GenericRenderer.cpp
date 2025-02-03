@@ -1,11 +1,10 @@
 // GenericRenderer.cpp : Defines the entry point for the application.
 //
-
 #include "stdinc.h"
 
+#include "GenericRenderer.h"
 
 #include "framework.h"
-#include "GenericRenderer.h"
 
 #include "DaedalusCore.h"
 

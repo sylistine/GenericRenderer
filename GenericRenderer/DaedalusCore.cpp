@@ -12,6 +12,7 @@ namespace Daedalus
     vk::Instance instance = VK_NULL_HANDLE;
     vk::SurfaceKHR surface = VK_NULL_HANDLE;
     vk::Device device = VK_NULL_HANDLE;
+    vk::DispatchLoaderDynamic loader;
 
     inline bool success(vk::Result res) { return res == vk::Result::eSuccess; }
 
@@ -25,13 +26,13 @@ namespace Daedalus
         // unavailable items in the enabled* vectors are considered required,
         // and available items in the optional* vectors will be pushed onto the enabled* vectors.
 
-        auto enabledLayers = List<cstr>();
+        auto enabledLayers = List<sstr>();
 #if defined(_DEBUG)
-        auto validationLayer = String("VK_LAYER_KHRONOS_validation");
+        auto validationLayer = SString("VK_LAYER_KHRONOS_validation");
         enabledLayers.push_back(validationLayer.c_str());
 #endif
 
-        auto enabledExts = List<cstr>();
+        auto enabledExts = List<sstr>();
 #if defined(_DEBUG)
         enabledExts.push_back(vk::EXTDebugUtilsExtensionName);
 #endif
@@ -67,7 +68,7 @@ namespace Daedalus
         instanceCI.ppEnabledExtensionNames = enabledExts.data();
 
 #if defined(_DEBUG)
-        auto debugUtilsMessengerCI = Debug::getDebugMessengerCreateInfo();
+        auto debugUtilsMessengerCI = Debug::getMessengerCreateInfo();
         debugUtilsMessengerCI.pNext = instanceCI.pNext;
         instanceCI.pNext = &debugUtilsMessengerCI;
 #endif
@@ -207,11 +208,11 @@ namespace Daedalus
 
         auto deviceFeatures = vk::PhysicalDeviceFeatures();
 
-        auto enabledLayers = List<cstr>();
-        auto optionalLayers = List<cstr>();
+        auto enabledLayers = List<sstr>();
+        auto optionalLayers = List<sstr>();
 
-        auto enabledExtensions = List<cstr>();
-        auto optionalExtensions = List<cstr>();
+        auto enabledExtensions = List<sstr>();
+        auto optionalExtensions = List<sstr>();
         // Core rendering feature.
         enabledExtensions.push_back(vk::KHRSwapchainExtensionName);
         // Variable rate shading

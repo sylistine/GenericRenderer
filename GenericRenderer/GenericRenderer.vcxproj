@@ -155,6 +155,7 @@
     <ClCompile Include="App.cpp" />
     <ClCompile Include="GenericRenderer.cpp" />
     <ClCompile Include="DaedalusCore.cpp" />
+    <ClCompile Include="stdinc.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="GenericRenderer.rc" />

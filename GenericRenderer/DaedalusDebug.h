@@ -14,32 +14,35 @@ namespace Debug
         const VkDebugUtilsMessengerCallbackDataEXT*,
         void*);
 
-    PFN_vkCreateDebugUtilsMessengerEXT createDebugMessenger;
-    PFN_vkDestroyDebugUtilsMessengerEXT destroyDebugMessenger;
+    vk::DebugUtilsMessengerEXT messenger;
+    vk::DispatchLoaderDynamic loader;
 
-    VkDebugUtilsMessengerEXT debugMessenger;
-
-
-    inline VkDebugUtilsMessengerCreateInfoEXT getDebugMessengerCreateInfo()
+    /// <summary>
+    /// This is also used before instance creation for instance create debug logging.
+    /// </summary>
+    /// <returns></returns>
+    inline vk::DebugUtilsMessengerCreateInfoEXT getMessengerCreateInfo()
     {
-        auto createInfo = VkDebugUtilsMessengerCreateInfoEXT{};
-        createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        createInfo.messageSeverity = 
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-        createInfo.messageType = 
-            VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT;
+        using sevFlags = vk::DebugUtilsMessageSeverityFlagBitsEXT;
+        using typeFlags = vk::DebugUtilsMessageTypeFlagBitsEXT;
+        auto createInfo = vk::DebugUtilsMessengerCreateInfoEXT{};
+        createInfo.messageSeverity =
+            sevFlags::eVerbose |
+            sevFlags::eInfo |
+            sevFlags::eWarning |
+            sevFlags::eError;
+        createInfo.messageType =
+            typeFlags::eGeneral |
+            typeFlags::eValidation |
+            typeFlags::ePerformance |
+            typeFlags::eDeviceAddressBinding;
         createInfo.pfnUserCallback = debugLogger;
         return createInfo;
     }
-    inline cstr translateSeverityFlagBits(VkDebugUtilsMessageSeverityFlagBitsEXT bits)
+
+    inline sstr translateSeverityFlagBits(VkDebugUtilsMessageSeverityFlagBitsEXT flags)
     {
-        switch (bits) {
+        switch (flags) {
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
             return "V";
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
@@ -52,7 +55,7 @@ namespace Debug
             return "?";
         }
     }
-    inline cstr translateTypeFlags(VkDebugUtilsMessageTypeFlagsEXT flags)
+    inline sstr translateTypeFlags(VkDebugUtilsMessageTypeFlagsEXT flags)
     {
         switch (flags) {
         case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT:
@@ -67,54 +70,19 @@ namespace Debug
             return "Unknown Message Type";
         }
     }
-    String itoa(u64 i, u16 b = 10)
-    {
-        auto str = String("");
-
-        const int numstart = '0';
-        const int majstart = 'A';
-        const int minstart = 'a';
-        while (i > 0) {
-            auto v = i % b;
-            auto out = v > 9 ? (char)(minstart + (v-10)) : (char)(numstart + v);
-            str = String(1,out) + str;
-
-            i /= b;
-        }
-
-        return str;
-    }
-    String itoa(u32 i, u16 b = 10)
-    {
-        return itoa(i, b);
-    }
-    String itoa(u16 i, u16 b = 10)
-    {
-        return itoa(i, b);
-    }
-    String itoa(i32 i, u16 b = 10)
-    {
-        if (i < 0) {
-            return String(1, '-') + itoa((u64)(- 1 * i), b);
-        } else {
-            return itoa((u64)i, b);
-        }
-    }
 
     void setup(vk::Instance instance)
     {
-        createDebugMessenger = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-            instance, "vkCreateDebugUtilsMessengerEXT");
-        destroyDebugMessenger = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-            instance, "vkDestroyDebugUtilsMessengerEXT");
+        loader.init();
+        loader.init(instance);
 
-        auto createInfo = getDebugMessengerCreateInfo();
-        createDebugMessenger(instance, &createInfo, nullptr, &debugMessenger);
+        messenger = instance.createDebugUtilsMessengerEXT(
+            getMessengerCreateInfo(), nullptr, loader);
     }
 
     void cleanup(vk::Instance instance)
     {
-        destroyDebugMessenger(instance, debugMessenger, nullptr);
+        instance.destroyDebugUtilsMessengerEXT(messenger, nullptr, loader);
     }
 
     VkBool32 debugLogger(
@@ -123,18 +91,11 @@ namespace Debug
         const VkDebugUtilsMessengerCallbackDataEXT* data,
         void* userData)
     {
-        auto tagPre = String("[");
-        auto tagPost = String("]");
+        auto prefix = SString("Daedalus Vulkan Debug");
 
-        auto prefix = String("Daedalus Vulkan Debug");
+        auto severityLabel = SString(translateSeverityFlagBits(severityFlag));
+        auto typeLabel = SString(translateTypeFlags(typeFlags));
 
-        auto severityLabel = String(translateSeverityFlagBits(severityFlag));
-        auto typeLabel = String(translateTypeFlags(typeFlags));
-
-
-        //auto labelPad = 16 - typeLabel.length();
-        //if (labelPad > 0) typeLabel.append(labelPad, ' ');
-        
         auto msg = prefix + " [" + severityLabel + "] ";
         
         if ((typeFlags & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) != 0) {
