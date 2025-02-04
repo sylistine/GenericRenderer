@@ -6,21 +6,58 @@
 
 namespace VkUtil
 {
-    String prettyString_QueueFamilies(vk::PhysicalDevice device)
+    inline String horizontalLine(
+        char16_t lc, // left cross
+        char16_t mc, // middle cross
+        char16_t rc, // right cross
+        char16_t span, // span char
+        u16 cwidth,
+        u16 ccount)
     {
-        auto str = String(u"");
+        String str = String(1, lc);
 
-        // 13 long, last idx 12
-        List<ustr> columns;
-        columns.push_back(u"     idx     ");
-        columns.push_back(u"   Graphics  ");
-        columns.push_back(u"   Compute   ");
-        columns.push_back(u"   Transfer  ");
-        columns.push_back(u"  SparseBind ");
-        columns.push_back(u"  Protected  ");
-        columns.push_back(u"   Vid-Dec   ");
-        columns.push_back(u"   Vid-Enc   ");
-        columns.push_back(u"  OpticalNV  ");
+        for (u16 i = 0; i < ccount; i++) {
+            str += String(cwidth, span) + String(1, mc);
+        }
+        str[str.size() - 1] = rc;
+        str.push_back(u'\n');
+        return str;
+    }
+
+    String getQueueFamilyPropertiesPrettyString(
+        vk::PhysicalDevice gpu,
+        vk::SurfaceKHR surface = VK_NULL_HANDLE)
+    {
+        String str;
+        // Begin queue family table.
+        auto props = gpu.getQueueFamilyProperties();
+
+        // Setup header labels.
+        List<ustr> labelLiterals;
+        labelLiterals.push_back(u"idx");
+        labelLiterals.push_back(u"Graphics");
+        labelLiterals.push_back(u"Compute");
+        labelLiterals.push_back(u"Transfer");
+        labelLiterals.push_back(u"SparseBind");
+        labelLiterals.push_back(u"Protected");
+        labelLiterals.push_back(u"Vid-Dec");
+        labelLiterals.push_back(u"Vid-Enc");
+        labelLiterals.push_back(u"OpticalNV");
+        if (surface != VK_NULL_HANDLE) {
+            labelLiterals.push_back(u"Present");
+        }
+        auto maxlen = 0;
+        for (auto& literal : labelLiterals) {
+            auto cur = strlen(literal);
+            if (cur > maxlen) {
+                maxlen = cur;
+            }
+        }
+        List<String> labelStrings;
+        auto spanWidth = maxlen + 2;
+        for(auto& literal : labelLiterals) {
+            labelStrings.push_back(pad(String(literal), spanWidth, Alignment::Center));
+        }
         
         auto tl = u'┌';
         auto tc = u'┬';
@@ -33,72 +70,75 @@ namespace VkUtil
         auto br = u'┘';
         auto v = u'│';
         auto h = u'─';
-        auto b = u"─────────────";
-        auto yea = u"      ●      ";
-        auto nay = u"      ‐      ";
+        auto y = u'●';
+        auto n = u'‐';
+
+        auto yea = pad(String(1, y), spanWidth, Alignment::Center);
+        auto nay = pad(String(1, n), spanWidth, Alignment::Center);
 
         // Top edge.
-        str += String(1, tl);
-        for (auto& column : columns) {
-            str += String(b) + String(1, tc);
-        }
-        str[str.size() - 1] = tr;
-        str.push_back(u'\n');
+        auto colWidth = labelStrings[0].length();
+        auto colCount = labelStrings.size();
+        str += horizontalLine(tl, tc, tr, h, colWidth, colCount);
 
         // Header labels.
-        for (auto& column : columns) {
+        for (auto& column : labelStrings) {
             str.push_back(v);
-            str += String(column);
+            str += column;
         }
         str.push_back(v);
         str.push_back(u'\n');
 
         // Middle edge.
-        str += String(1, lc);
-        for (auto& column : columns) {
-            str += String(b) + String(1, t);
-        }
-        str[str.size() - 1] = rc;
-        str.push_back(u'\n');
+        str += horizontalLine(lc, t, rc, h, colWidth, colCount);
 
-        auto props = device.getQueueFamilyProperties();
+        // Add a row for each queue family on the GPU.
         for (auto i = 0; i < props.size(); i++) {
-            auto numstr = atou(itoa(i));
-
-            str.push_back(v);
-            str += String(6, u' ') + numstr + String(7 - numstr.length(), u' ');
-            str.push_back(v);
             using flags = vk::QueueFlagBits;
-            str += (props[i].queueFlags & flags::eGraphics) ? yea : nay;
-            str.push_back(v);
-            str += (props[i].queueFlags & flags::eCompute) ? yea : nay;
-            str.push_back(v);
-            str += (props[i].queueFlags & flags::eTransfer) ? yea : nay;
-            str.push_back(v);
-            str += (props[i].queueFlags & flags::eSparseBinding) ? yea : nay;
-            str.push_back(v);
-            str += (props[i].queueFlags & flags::eProtected) ? yea : nay;
-            str.push_back(v);
-            str += (props[i].queueFlags & flags::eVideoDecodeKHR) ? yea : nay;
-            str.push_back(v);
-            str += (props[i].queueFlags & flags::eVideoEncodeKHR) ? yea : nay;
-            str.push_back(v);
-            str += (props[i].queueFlags & flags::eOpticalFlowNV) ? yea : nay;
+            auto& prop = props[i];
+            auto idxStr = atou(itoa(i));
+
+            str += String(1, v) + pad(String(idxStr), spanWidth, Alignment::Center);
+            str += String(1, v) + ((prop.queueFlags & flags::eGraphics) ? yea : nay);
+            str += String(1, v) + ((prop.queueFlags & flags::eCompute) ? yea : nay);
+            str += String(1, v) + ((prop.queueFlags & flags::eTransfer) ? yea : nay);
+            str += String(1, v) + ((prop.queueFlags & flags::eSparseBinding) ? yea : nay);
+            str += String(1, v) + ((prop.queueFlags & flags::eProtected) ? yea : nay);
+            str += String(1, v) + ((prop.queueFlags & flags::eVideoDecodeKHR) ? yea : nay);
+            str += String(1, v) + ((prop.queueFlags & flags::eVideoEncodeKHR) ? yea : nay);
+            str += String(1, v) + ((prop.queueFlags & flags::eOpticalFlowNV) ? yea : nay);
+            if (surface != VK_NULL_HANDLE) {
+                auto surfaceSupport = gpu.getSurfaceSupportKHR(i, surface);
+                str += String(1, v) + ((surfaceSupport) ? yea : nay);
+            }
             str.push_back(v);
             str.push_back(u'\n');
 
-            // Middle edge.
+            // Middle or bottom edge.
             auto l = i == props.size() - 1 ? bl : lc;
             auto c = i == props.size() - 1 ? bc : t;
             auto r = i == props.size() - 1 ? br : rc;
-            str += String(1, l);
-            for (auto& column : columns) {
-                str += String(b) + String(1, c);
-            }
-            str[str.size() - 1] = r;
-            str.push_back(u'\n');
+            str += horizontalLine(l, c, r, h, colWidth, colCount);
         }
 
         return str;
+    }
+
+    // Builds a pretty string describing the physical device properties.
+    // If a Surface is provided, this will also return whether or not the queue families
+    // also support present.
+    String to_prettyString(vk::PhysicalDevice gpu, vk::SurfaceKHR surface = VK_NULL_HANDLE)
+    {
+            auto props = gpu.getProperties();
+
+            auto name = String(atou(props.deviceName));
+            auto type = String(atou(vk::to_string(props.deviceType)));
+
+            auto str = String(u"");
+            str += String(u"Physical Device: ") + name + String(u"\n");
+            str += String(u"Device Type: ") + type + String(u"\n");
+
+            str += getQueueFamilyPropertiesPrettyString(gpu, surface);
+            return str;
     }
 }

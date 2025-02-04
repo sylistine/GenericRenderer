@@ -57,6 +57,34 @@ String atou(SString in)
     return out;
 }
 
+// crazy that the standard lib doesn't have functions to count char16_t strings.
+u64 strlen(ustr str)
+{
+    u64 len = 0;
+    while (str[len]) {
+        len++;
+    }
+    return len;
+}
+
+String pad(String str, u64 len, Alignment align)
+{
+    if (len < str.length()) return str;
+
+    auto padCount = len - str.length();
+    if (align == Alignment::Left) {
+        str = str + String(padCount, u' ');
+    } else if (align == Alignment::Center) {
+        auto halfPadCount = padCount / 2;
+        auto padLeft = String(padCount / 2, u' ');
+        auto padRight = String(padCount % 2 ? halfPadCount + 1 : halfPadCount, u' ');
+        str = padLeft + str + padRight;
+    } else {
+        str = String(padCount, u' ') + str;
+    }
+    return str;
+}
+
 void Log(sstr log)
 {
     OutputDebugStringA(log);

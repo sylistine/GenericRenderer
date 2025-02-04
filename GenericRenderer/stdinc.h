@@ -37,5 +37,15 @@ SString itoa(i16, u16 = 10);
 
 String atou(SString);
 
+u64 strlen(ustr);
+
+enum Alignment
+{
+    Left,
+    Center,
+    Right
+};
+String pad(String, u64, Alignment);
+
 void Log(sstr log);
 void Log(ustr log);

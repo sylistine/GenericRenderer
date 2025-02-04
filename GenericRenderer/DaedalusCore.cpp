@@ -132,7 +132,7 @@ namespace Daedalus
         //physicalDeviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu;
         for (auto gpu : gpus) {
             // A helpful visualization of queue family properties.
-            //Log(VkUtil::prettyString_QueueFamilies(gpu).c_str());
+            Log(VkUtil::to_prettyString(gpu, surface).c_str());
 
             auto info = GPUInfo();
             info.gpu = gpu;
