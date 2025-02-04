@@ -124,9 +124,17 @@ namespace VkUtil
         return str;
     }
 
-    // Builds a pretty string describing the physical device properties.
-    // If a Surface is provided, this will also return whether or not the queue families
-    // also support present.
+    /// <summary>
+    /// Builds a pretty string describing physical device properties.
+    /// 
+    /// QueueFamily flags are displayed in a neat table.
+    /// 
+    /// If a Surface is provided, the returned string will also display whether or not
+    /// the queue families also support present.
+    /// </summary>
+    /// <param name="gpu">A vk::PhysicalDevice object.</param>
+    /// <param name="surface">(Optional) A vk::SurfaceKHR to test for Queue support.</param>
+    /// <returns></returns>
     String to_prettyString(vk::PhysicalDevice gpu, vk::SurfaceKHR surface = VK_NULL_HANDLE)
     {
             auto props = gpu.getProperties();

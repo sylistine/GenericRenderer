@@ -1,6 +1,5 @@
 #include "stdinc.h"
 
-// For fun, maybe, but also I didn't want to include another stdlib just for this.
 SString itoa(u64 i, u16 b)
 {
     if (i == 0) {
@@ -57,7 +56,6 @@ String atou(SString in)
     return out;
 }
 
-// crazy that the standard lib doesn't have functions to count char16_t strings.
 u64 strlen(ustr str)
 {
     u64 len = 0;
