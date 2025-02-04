@@ -6,6 +6,7 @@
 #endif
 
 #include <vulkan/vulkan.hpp>
+#include "VulkanUtils.h"
 
 namespace Daedalus
 {
@@ -130,6 +131,9 @@ namespace Daedalus
         // If multiple GPUs support graphics and present, select:
         //physicalDeviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu;
         for (auto gpu : gpus) {
+            // A helpful visualization of queue family properties.
+            //Log(VkUtil::prettyString_QueueFamilies(gpu).c_str());
+
             auto info = GPUInfo();
             info.gpu = gpu;
 

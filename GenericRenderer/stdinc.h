@@ -29,10 +29,13 @@ enum Result
     Failed
 };
 
-SString itoa(u64, u16);
-SString itoa(u32, u16);
-SString itoa(u16, u16);
-SString itoa(i32, u16);
+SString itoa(u64, u16 = 10);
+SString itoa(u32, u16 = 10);
+SString itoa(u16, u16 = 10);
+SString itoa(i32, u16 = 10);
+SString itoa(i16, u16 = 10);
+
+String atou(SString);
 
 void Log(sstr log);
 void Log(ustr log);

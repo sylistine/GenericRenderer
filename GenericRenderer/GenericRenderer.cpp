@@ -1,4 +1,4 @@
-// GenericRenderer.cpp : Defines the entry point for the application.
+﻿// GenericRenderer.cpp : Defines the entry point for the application.
 //
 #include "stdinc.h"
 
