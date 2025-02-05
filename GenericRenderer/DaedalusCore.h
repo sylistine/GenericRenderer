@@ -6,7 +6,7 @@
 #include <Windows.h>
 #endif
 
-namespace Daedalus
+namespace Engine::Daedalus
 {
     Result initialize();
     Result terminate();

@@ -1,4 +1,4 @@
-#include "stdinc.h"
+#include "Precompiled.h"
 #include "DaedalusCore.h"
 
 #if defined(_DEBUG)
@@ -8,7 +8,7 @@
 #include <vulkan/vulkan.hpp>
 #include "VulkanUtils.h"
 
-namespace Daedalus
+namespace Engine::Daedalus
 {
     vk::Instance instance = VK_NULL_HANDLE;
     vk::SurfaceKHR surface = VK_NULL_HANDLE;
@@ -63,9 +63,9 @@ namespace Daedalus
 
         auto instanceCI = vk::InstanceCreateInfo();
         instanceCI.pApplicationInfo = &appInfo;
-        instanceCI.enabledLayerCount = enabledLayers.size();
+        instanceCI.enabledLayerCount = (u32)enabledLayers.size();
         instanceCI.ppEnabledLayerNames = enabledLayers.data();
-        instanceCI.enabledExtensionCount = enabledExts.size();
+        instanceCI.enabledExtensionCount = (u32)enabledExts.size();
         instanceCI.ppEnabledExtensionNames = enabledExts.data();
 
 #if defined(_DEBUG)
@@ -92,7 +92,7 @@ namespace Daedalus
             instance.destroy(surface);
         }
         if (instance != VK_NULL_HANDLE) {
-            Debug::cleanup(instance);
+            Debug::cleanup();
             instance.destroy();
         }
 
@@ -130,10 +130,14 @@ namespace Daedalus
         // Acquire a GPU with both present and graphics capabilities.
         // If multiple GPUs support graphics and present, select:
         //physicalDeviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu;
+#if defined(_DEBUG)
+        Engine::Debug::Log(u"============Physical Device Info============\n");
+#endif
         for (auto gpu : gpus) {
+#if defined(_DEBUG)
             // A helpful visualization of queue family properties.
-            Log(VkUtil::to_prettyString(gpu, surface).c_str());
-
+            Engine::Debug::Log(VkUtil::to_prettyString(gpu, surface).c_str());
+#endif
             auto info = GPUInfo();
             info.gpu = gpu;
 
@@ -171,6 +175,10 @@ namespace Daedalus
             }
             gpuInfos.push_back(info);
         }
+#if defined(_DEBUG)
+        Engine::Debug::Log(u"============================================\n");
+#endif
+
         if (gpuInfos.size() < 1) {
             OutputDebugString(L"Unable to find a GPU with graphics and present capabilities.");
             return Result::Failed;
@@ -302,11 +310,11 @@ namespace Daedalus
         }
 
         auto deviceCI = vk::DeviceCreateInfo();
-        deviceCI.queueCreateInfoCount = queueCreateInfos.size();
+        deviceCI.queueCreateInfoCount = (u32)queueCreateInfos.size();
         deviceCI.pQueueCreateInfos = queueCreateInfos.data();
-        deviceCI.enabledLayerCount = enabledLayers.size();
+        deviceCI.enabledLayerCount = (u32)enabledLayers.size();
         deviceCI.ppEnabledLayerNames = enabledLayers.data();
-        deviceCI.enabledExtensionCount = enabledExtensions.size();
+        deviceCI.enabledExtensionCount = (u32)enabledExtensions.size();
         deviceCI.ppEnabledExtensionNames = enabledExtensions.data();
         deviceCI.pEnabledFeatures = &deviceFeatures;
 

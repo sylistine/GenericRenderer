@@ -1,22 +1,22 @@
 ﻿#pragma once
 
-#include "stdinc.h"
+#include "Utils.h"
 
 #include <vulkan/vulkan.hpp>
 
-namespace VkUtil
+namespace Engine::Daedalus::VkUtil
 {
     inline String horizontalLine(
         char16_t lc, // left cross
         char16_t mc, // middle cross
         char16_t rc, // right cross
         char16_t span, // span char
-        u16 cwidth,
-        u16 ccount)
+        u64 cwidth,
+        u64 ccount)
     {
         String str = String(1, lc);
 
-        for (u16 i = 0; i < ccount; i++) {
+        for (auto i = 0u; i < ccount; i++) {
             str += String(cwidth, span) + String(1, mc);
         }
         str[str.size() - 1] = rc;
@@ -28,6 +28,8 @@ namespace VkUtil
         vk::PhysicalDevice gpu,
         vk::SurfaceKHR surface = VK_NULL_HANDLE)
     {
+        using namespace StrUtil;
+
         String str;
         // Begin queue family table.
         auto props = gpu.getQueueFamilyProperties();
@@ -46,9 +48,9 @@ namespace VkUtil
         if (surface != VK_NULL_HANDLE) {
             labelLiterals.push_back(u"Present");
         }
-        auto maxlen = 0;
+        auto maxlen = 0u;
         for (auto& literal : labelLiterals) {
-            auto cur = strlen(literal);
+            auto cur = len(literal);
             if (cur > maxlen) {
                 maxlen = cur;
             }
@@ -77,8 +79,8 @@ namespace VkUtil
         auto nay = pad(String(1, n), spanWidth, Alignment::Center);
 
         // Top edge.
-        auto colWidth = labelStrings[0].length();
-        auto colCount = labelStrings.size();
+        auto colWidth = (u64)labelStrings[0].length();
+        auto colCount = (u64)labelStrings.size();
         str += horizontalLine(tl, tc, tr, h, colWidth, colCount);
 
         // Header labels.
@@ -96,7 +98,7 @@ namespace VkUtil
         for (auto i = 0; i < props.size(); i++) {
             using flags = vk::QueueFlagBits;
             auto& prop = props[i];
-            auto idxStr = atou(itoa(i));
+            auto idxStr = Convert::atou(Convert::itoa(i));
 
             str += String(1, v) + pad(String(idxStr), spanWidth, Alignment::Center);
             str += String(1, v) + ((prop.queueFlags & flags::eGraphics) ? yea : nay);
@@ -139,8 +141,8 @@ namespace VkUtil
     {
             auto props = gpu.getProperties();
 
-            auto name = String(atou(props.deviceName));
-            auto type = String(atou(vk::to_string(props.deviceType)));
+            auto name = String(Convert::atou(props.deviceName));
+            auto type = String(Convert::atou(vk::to_string(props.deviceType)));
 
             auto str = String(u"");
             str += String(u"Physical Device: ") + name + String(u"\n");

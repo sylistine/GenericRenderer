@@ -113,7 +113,8 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;VK_USE_PLATFORM_WIN32_KHR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Create</PrecompiledHeader>
-      <PrecompiledHeaderFile>stdinc.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile>Precompiled.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -130,7 +131,8 @@
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;VK_USE_PLATFORM_WIN32_KHR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Create</PrecompiledHeader>
-      <PrecompiledHeaderFile>stdinc.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile>Precompiled.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -143,19 +145,25 @@
   <ItemGroup>
     <ClInclude Include="App.h" />
     <ClInclude Include="DaedalusDebug.h" />
+    <ClInclude Include="Debug.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="GenericRenderer.h" />
+    <ClInclude Include="Precompiled.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="stdinc.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="DaedalusCore.h" />
+    <ClInclude Include="Types.h" />
+    <ClInclude Include="Utils.h" />
     <ClInclude Include="VulkanUtils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="App.cpp" />
+    <ClCompile Include="DaedalusDebug.cpp" />
+    <ClCompile Include="Debug.cpp" />
     <ClCompile Include="GenericRenderer.cpp" />
     <ClCompile Include="DaedalusCore.cpp" />
-    <ClCompile Include="stdinc.cpp" />
+    <ClCompile Include="Utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="GenericRenderer.rc" />

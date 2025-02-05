@@ -1,6 +1,6 @@
 ﻿// GenericRenderer.cpp : Defines the entry point for the application.
 //
-#include "stdinc.h"
+#include "Precompiled.h"
 
 #include "GenericRenderer.h"
 
@@ -41,13 +41,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         return FALSE;
     }
 
-    if (Daedalus::initialize() != Result::Success) {
+    if (Engine::Daedalus::initialize() != Result::Success) {
         OutputDebugString(L"Daedalus failed to initialize.\n");
         return FALSE;
     }
-    if (Daedalus::createSurface(hInstance, hWnd) != Result::Success) {
+    if (Engine::Daedalus::createSurface(hInstance, hWnd) != Result::Success) {
         OutputDebugString(L"Daedalus failed to create a surface.\n");
-        Daedalus::terminate();
+        Engine::Daedalus::terminate();
         return FALSE;
     }
 
@@ -65,7 +65,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         }
     }
 
-    Daedalus::terminate();
+    Engine::Daedalus::terminate();
 
     return (int) msg.wParam;
 }
