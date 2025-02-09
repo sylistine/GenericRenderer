@@ -15,6 +15,15 @@ namespace Engine::Daedalus
     vk::Device device = VK_NULL_HANDLE;
     vk::DispatchLoaderDynamic loader;
 
+    struct GPUInfo
+    {
+        vk::PhysicalDevice gpu;
+        bool isDiscrete = false;
+        u32 graphicsFamilyIdx = UINT32_MAX;
+        u32 presentFamilyIdx = UINT32_MAX;
+        u32 transferFamilyIdx = UINT32_MAX;
+    };
+
     inline bool success(vk::Result res) { return res == vk::Result::eSuccess; }
 
     Result initialize()
@@ -113,15 +122,6 @@ namespace Engine::Daedalus
     }
 #endif
 
-    struct GPUInfo
-    {
-        vk::PhysicalDevice gpu;
-        bool isDiscrete = false;
-        u32 graphicsFamilyIdx = UINT32_MAX;
-        u32 presentFamilyIdx = UINT32_MAX;
-        u32 transferFamilyIdx = UINT32_MAX;
-    };
-
     Result createDevice()
     {
         auto gpus = instance.enumeratePhysicalDevices();
@@ -130,9 +130,7 @@ namespace Engine::Daedalus
         // Acquire a GPU with both present and graphics capabilities.
         // If multiple GPUs support graphics and present, select:
         //physicalDeviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu;
-#if defined(_DEBUG)
         Engine::Debug::Log(u"============Physical Device Info============\n");
-#endif
         for (auto gpu : gpus) {
 #if defined(_DEBUG)
             // A helpful visualization of queue family properties.
@@ -175,9 +173,7 @@ namespace Engine::Daedalus
             }
             gpuInfos.push_back(info);
         }
-#if defined(_DEBUG)
         Engine::Debug::Log(u"============================================\n");
-#endif
 
         if (gpuInfos.size() < 1) {
             OutputDebugString(L"Unable to find a GPU with graphics and present capabilities.");
@@ -220,106 +216,109 @@ namespace Engine::Daedalus
 
         auto deviceFeatures = vk::PhysicalDeviceFeatures();
 
-        auto enabledLayers = List<sstr>();
-        auto optionalLayers = List<sstr>();
+        auto layers = List<sstr>();
+        auto optLayers = List<sstr>();
 
-        auto enabledExtensions = List<sstr>();
-        auto optionalExtensions = List<sstr>();
-        // Core rendering feature.
-        enabledExtensions.push_back(vk::KHRSwapchainExtensionName);
-        // Variable rate shading
-        optionalExtensions.push_back(vk::KHRFragmentShadingRateExtensionName);
-        // Intended for optimization of Pipeline Cache compilation during an app's runtime.
-        optionalExtensions.push_back(vk::EXTPipelineCreationCacheControlExtensionName);
-        // Speeds up sequences of draw commands by loading them all and obviating state checks.
-        optionalExtensions.push_back(vk::EXTMultiDrawExtensionName);
-        // [Obsolete] This extension enables GPU culling
-        //optionalExtensions.push_back(VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME);
-        // This extension may help optimize framebuffer attachments that are also used as inputs.
-        // Note: not available on 1 out of 1 nvidia gpus.
-        optionalExtensions.push_back(vk::EXTRasterizationOrderAttachmentAccessExtensionName);
-        // For fun
-        optionalExtensions.push_back(vk::EXTMeshShaderExtensionName);
+        auto extensions = List<sstr>();
+        auto optExtensions = List<sstr>();
+        // Create Extension Lists
+        {
+            // Core rendering feature.
+            extensions.push_back(vk::KHRSwapchainExtensionName);
+            // Variable rate shading
+            optExtensions.push_back(vk::KHRFragmentShadingRateExtensionName);
+            // Intended for optimization of Pipeline Cache compilation during an app's runtime.
+            optExtensions.push_back(vk::EXTPipelineCreationCacheControlExtensionName);
+            // Speeds up sequences of draw commands by loading them all and obviating state checks.
+            optExtensions.push_back(vk::EXTMultiDrawExtensionName);
+            // [Obsolete] This extension enables GPU culling
+            //optionalExtensions.push_back(VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME);
+            // This extension may help optimize framebuffer attachments that are also used as inputs.
+            // Note: not available on 1 out of 1 nvidia gpus.
+            optExtensions.push_back(vk::EXTRasterizationOrderAttachmentAccessExtensionName);
+            // For fun
+            optExtensions.push_back(vk::EXTMeshShaderExtensionName);
 #if defined(_SPATIAL)
-        // Core rendering feature in spatial applications.
-        enabledExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
-        // Enables foveated rendering.
-        // Note: fragment density mmap extension not available on nvidia device.
-        // Maybe only on tiled renderers?
-        optionalExtensions.push_back(VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME);
-        // Enables more  performant foveated rendering.
-        optionalExtensions.push_back(VK_EXT_FRAGMENT_DENSITY_MAP_2_EXTENSION_NAME);
+            // Core rendering feature in spatial applications.
+            enabledExtensions.push_back(vk::KHRMultiviewExtensionName);
+            // Enables foveated rendering.
+            // Note: fragment density mmap extension not available on nvidia device.
+            // Maybe only on tiled renderers?
+            optExtensions.push_back(vk::EXTFragmentDensityMapExtensionName);
+            // Enables more  performant foveated rendering.
+            optExtensions.push_back(vk::EXTFragmentDensityMap2ExtensionName);
 #if defined(_QCOM)
-        // Enables high performance density map offsets, i.e. in gaze-based foveation.
-        optionalExtensions.push_back(VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_EXTENSION_NAME);
+            // Enables high performance density map offsets, i.e. in gaze-based foveation.
+            optExtensions.push_back(vk::QCOMFragmentDensityMapOffsetExtensionName);
 #endif // _QCOM
 #endif // _SPATIAL
 #if defined(_MOBILE)
-        // Might be necessary on mobile platforms. Maybe also on IOS?
-        enabledExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
-        enabledExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
-        // Enables programmable blending in tiled renderers. Maybe useful for color grading.
-        // Depends on dynamic rendering.
-        optionalExtensions.push_back(VK_EXT_SHADER_TILE_IMAGE_EXTENSION_NAME);
+            // Might be necessary on mobile platforms. Maybe also on IOS?
+            extensions.push_back(vk::KHRExternalMemoryCapabilitiesExtensionName);
+            extensions.push_back(vk::KHRExternalMemoryExtensionName);
+            // Enables programmable blending in tiled renderers. Maybe useful for color grading.
+            // Depends on dynamic rendering.
+            optExtensions.push_back(vk::EXTShaderTileImageExtensionName);
 #if defined(_QCOM)
-        // Provides tile information to the application. For... debugging?
-        optionalExtensions.push_back(VK_QCOM_TILE_PROPERTIES_EXTENSION_NAME);
-        // Allows custom logic when writing tiles out to shared memory.
-        optionalExtensions.push_back(VK_QCOM_RENDER_PASS_SHADER_RESOLVE_EXTENSION_NAME);
-        // Allows driver-level handling of image transform changes for performance.
-        optionalExtensions.push_back(VK_QCOM_RENDER_PASS_TRANSFORM_EXTENSION_NAME);
-        // Useful for attachments that are tested against but never written to,
-        // such as a depth texture used after a depth pre-pass.
-        optionalExtensions.push_back(VK_QCOM_RENDER_PASS_STORE_OPS_EXTENSION_NAME);
-        // Enables some sampler filters for image processing.
-        // Perhaps enabling some kind of bloom or bokeh in a custom resolve shader?
-        optionalExtensions.push_back(VK_QCOM_IMAGE_PROCESSING_EXTENSION_NAME);
-        optionalExtensions.push_back(VK_QCOM_IMAGE_PROCESSING_2_EXTENSION_NAME);
+            // Provides tile information to the application. For... debugging?
+            optExtensions.push_back(vk::QCOMTilePropertiesExtensionName);
+            // Allows custom logic when writing tiles out to shared memory.
+            optExtensions.push_back(vk::QCOMRenderPassShaderResolveExtensionName);
+            // Allows driver-level handling of image transform changes for performance.
+            optExtensions.push_back(vk::QCOMRenderPassTransformExtensionName);
+            // Useful for attachments that are tested against but never written to,
+            // such as a depth texture used after a depth pre-pass.
+            optExtensions.push_back(vk::QCOMRenderPassStoreOpsExtensionName);
+            // Enables some sampler filters for image processing.
+            // Perhaps enabling some kind of bloom or bokeh in a custom resolve shader?
+            optExtensions.push_back(vk::QCOMImageProcessingExtensionName);
+            optExtensions.push_back(vk::QCOMImageProcessing2ExtensionName);
 #endif //_QCOM
 #endif // _MOBILE
 #if defined(_RAYTRACING)
-        enabledExtensions.push_back(VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME);
-        enabledExtensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
-        enabledExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
-        enabledExtensions.push_back(VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME);
-        // Enables blending ray tracing pipelines with rasterization pipelines.
-        enabledExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+            extensions.push_back(vk::KHRRayTracingPositionFetchExtensionName);
+            extensions.push_back(vk::KHRRayQueryExtensionName);
+            extensions.push_back(vk::KHRAccelerationStructureExtensionName);
+            extensions.push_back(vk::KHRRayTracingPositionFetchExtensionName);
+            // Enables blending ray tracing pipelines with rasterization pipelines.
+            extensions.push_back(vk::KHRRayTracingPipelineExtensionName);
 #if defined(_DEBUG)
-        enabledExtensions.push_back(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME);
+            extensions.push_back(vk::NVRayTracingValidationExtensionName);
 #endif // _DEBUG
-        // if  nvidia
-        optionalExtensions.push_back(VK_NV_RAY_TRACING_MOTION_BLUR_EXTENSION_NAME);
+            // if  nvidia
+            optExtensions.push_back(vk::NVRayTracingMotionBlurExtensionName);
 #endif // _RAYTRACING
 #if defined(_DEBUG)
-        // Note: not available on 1 out of 1 nvidia gpus.
-        optionalExtensions.push_back(vk::KHRPerformanceQueryExtensionName);
-        // Note: not available on 1 out of 1 nvidia gpus.
-        optionalExtensions.push_back(vk::EXTDeviceMemoryReportExtensionName);
+            // Note: not available on 1 out of 1 nvidia gpus.
+            optExtensions.push_back(vk::KHRPerformanceQueryExtensionName);
+            // Note: not available on 1 out of 1 nvidia gpus.
+            optExtensions.push_back(vk::EXTDeviceMemoryReportExtensionName);
 #endif
 
-        for (auto& eExt : enabledExtensions) {
-            auto found = false;
-            for (auto& sExt : supportedExtensions) {
-                found |= strcmp(eExt, sExt.extensionName) == 0;
-            }
-            if (!found) {
-                OutputDebugString(L"Extension missing: ");
-                OutputDebugStringA(eExt);
-                OutputDebugString(L"\n");
+            for (auto& eExt : extensions) {
+                auto found = false;
+                for (auto& sExt : supportedExtensions) {
+                    found |= strcmp(eExt, sExt.extensionName) == 0;
+                }
+                if (!found) {
+                    OutputDebugString(L"Extension missing: ");
+                    OutputDebugStringA(eExt);
+                    OutputDebugString(L"\n");
+                }
             }
         }
 
         auto deviceCI = vk::DeviceCreateInfo();
         deviceCI.queueCreateInfoCount = (u32)queueCreateInfos.size();
         deviceCI.pQueueCreateInfos = queueCreateInfos.data();
-        deviceCI.enabledLayerCount = (u32)enabledLayers.size();
-        deviceCI.ppEnabledLayerNames = enabledLayers.data();
-        deviceCI.enabledExtensionCount = (u32)enabledExtensions.size();
-        deviceCI.ppEnabledExtensionNames = enabledExtensions.data();
+        deviceCI.enabledLayerCount = (u32)layers.size();
+        deviceCI.ppEnabledLayerNames = layers.data();
+        deviceCI.enabledExtensionCount = (u32)extensions.size();
+        deviceCI.ppEnabledExtensionNames = extensions.data();
         deviceCI.pEnabledFeatures = &deviceFeatures;
 
         device = gpuInfos[gpuIdx].gpu.createDevice(deviceCI);
 
         return Result::Success;
     }
-} // namespace Daedalus
+} // namespace Engine::Daedalus

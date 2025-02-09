@@ -2,6 +2,16 @@
 
 namespace Engine::Debug
 {
-    void Log(sstr log);
-    void Log(ustr log);
+    inline void Log(sstr log)
+    {
+#if defined(_DEBUG)
+        OutputDebugStringA(log);
+#endif
+    }
+    inline void Log(ustr log)
+    {
+#if defined(_DEBUG)
+        OutputDebugStringW(reinterpret_cast<wstr>(log));
+#endif
+    }
 }
