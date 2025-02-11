@@ -10,19 +10,24 @@
 
 namespace Engine::Daedalus
 {
-    vk::Instance instance = VK_NULL_HANDLE;
-    vk::SurfaceKHR surface = VK_NULL_HANDLE;
-    vk::Device device = VK_NULL_HANDLE;
-    vk::DispatchLoaderDynamic loader;
-
-    struct GPUInfo
+    struct GPUProfile
     {
         vk::PhysicalDevice gpu;
         bool isDiscrete = false;
-        u32 graphicsFamilyIdx = UINT32_MAX;
+        u32 gfxFamilyIdx = UINT32_MAX;
+        u32 cmpFamilyIdx = UINT32_MAX;
         u32 presentFamilyIdx = UINT32_MAX;
-        u32 transferFamilyIdx = UINT32_MAX;
+        u32 dedicatedTfrFamilyIdx = UINT32_MAX;
     };
+
+    vk::Instance instance = VK_NULL_HANDLE;
+    vk::SurfaceKHR surface = VK_NULL_HANDLE;
+    List<GPUProfile> gpuProfiles;
+    u32 activeGPUIdx = UINT32_MAX;
+    vk::Device device = VK_NULL_HANDLE;
+    vk::CommandPool tfrCmdPool = VK_NULL_HANDLE;
+    vk::CommandPool gfxCmdPool = VK_NULL_HANDLE;
+    vk::DispatchLoaderDynamic loader;
 
     inline bool success(vk::Result res) { return res == vk::Result::eSuccess; }
 
@@ -108,47 +113,32 @@ namespace Engine::Daedalus
         return Result::Success;
     }
 
-    Result createDevice();
-
-#if defined(_WINDOWS)
-    Result createSurface(HINSTANCE hInstance, HWND hWnd)
-    {
-        auto createInfo = vk::Win32SurfaceCreateInfoKHR();
-        createInfo.hinstance = hInstance;
-        createInfo.hwnd = hWnd;
-        surface = instance.createWin32SurfaceKHR(createInfo);
-
-        return createDevice();
-    }
-#endif
-
     Result createDevice()
     {
-        auto gpus = instance.enumeratePhysicalDevices();
+        auto physicalDevices = instance.enumeratePhysicalDevices();
 
-        auto gpuInfos = List<GPUInfo>();
         // Acquire a GPU with both present and graphics capabilities.
         // If multiple GPUs support graphics and present, select:
         //physicalDeviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu;
         Engine::Debug::Log(u"============Physical Device Info============\n");
-        for (auto gpu : gpus) {
+        for (auto gpu : physicalDevices) {
 #if defined(_DEBUG)
             // A helpful visualization of queue family properties.
             Engine::Debug::Log(VkUtil::to_prettyString(gpu, surface).c_str());
 #endif
-            auto info = GPUInfo();
-            info.gpu = gpu;
+            auto profile = GPUProfile();
+            profile.gpu = gpu;
 
             auto queueFamilyProperties = gpu.getQueueFamilyProperties();
             auto properties = gpu.getProperties();
 
-            info.isDiscrete = properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu;
+            profile.isDiscrete = properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu;
 
             List<vk::Bool32> supportsPresent(queueFamilyProperties.size());
             for (auto i = 0; i < queueFamilyProperties.size(); i++) {
                 supportsPresent[i] = gpu.getSurfaceSupportKHR(i, surface);
-                if (info.presentFamilyIdx == UINT32_MAX && supportsPresent[i]) {
-                    info.presentFamilyIdx = i;
+                if (profile.presentFamilyIdx == UINT32_MAX && supportsPresent[i]) {
+                    profile.presentFamilyIdx = i;
                 }
             }
             // For now, like with most Vulkan samples, we'll try to get a family
@@ -156,59 +146,63 @@ namespace Engine::Daedalus
             // Later, we might also pick a queue that can focus exclusively on
             // transfer operations for moving local<->device data.
             for (auto i = 0; i < queueFamilyProperties.size(); i++) {
-                auto& family = queueFamilyProperties[i];
-                if (family.queueFlags & vk::QueueFlagBits::eGraphics) {
+                auto& flags = queueFamilyProperties[i].queueFlags;
+                auto gfxFlag = vk::QueueFlagBits::eGraphics;
+                auto cmpFlag = vk::QueueFlagBits::eCompute;
+                auto tfrFlag = vk::QueueFlagBits::eTransfer;
+
+                if (flags & gfxFlag) {
                     if (supportsPresent[i]) {
-                        info.graphicsFamilyIdx = i;
-                        info.presentFamilyIdx = i;
+                        profile.gfxFamilyIdx = i;
+                        profile.presentFamilyIdx = i;
                         break;
-                    } else if (info.graphicsFamilyIdx == UINT32_MAX) {
-                        info.graphicsFamilyIdx = i;
+                    } else if (profile.gfxFamilyIdx == UINT32_MAX) {
+                        profile.gfxFamilyIdx = i;
                     }
                 }
+                if ((flags & tfrFlag) && !(flags & gfxFlag)) {
+                    profile.dedicatedTfrFamilyIdx = i;
+                }
             }
-            if (info.graphicsFamilyIdx == UINT32_MAX ||
-                info.presentFamilyIdx == UINT32_MAX) {
+            if (profile.gfxFamilyIdx == UINT32_MAX ||
+                profile.presentFamilyIdx == UINT32_MAX) {
                 continue;
             }
-            gpuInfos.push_back(info);
+            gpuProfiles.push_back(profile);
         }
         Engine::Debug::Log(u"============================================\n");
 
-        if (gpuInfos.size() < 1) {
+        if (gpuProfiles.size() < 1) {
             OutputDebugString(L"Unable to find a GPU with graphics and present capabilities.");
             return Result::Failed;
         }
 
-        // We could use this list to present a set of options to the user.
-        auto gpuIdx = 0;
-        auto idealGPUFound = false;
-        for (auto i = 0; i < gpuInfos.size(); i++) {
-            if (gpuInfos[i].graphicsFamilyIdx == gpuInfos[i].presentFamilyIdx &&
-                gpuInfos[i].isDiscrete) {
-                gpuIdx = i;
-                idealGPUFound = true;
+        for (auto i = 0; i < gpuProfiles.size(); i++) {
+            if (gpuProfiles[i].gfxFamilyIdx == gpuProfiles[i].presentFamilyIdx &&
+                gpuProfiles[i].isDiscrete) {
+                activeGPUIdx = i;
                 break;
             }
         }
-        if (!idealGPUFound) {
+        if (activeGPUIdx == UINT32_MAX) {
             OutputDebugString(L"GPU is not ideal.");
         }
 
         // Select a favored GPU or let the user decide.
-        auto supportedLayers = gpuInfos[gpuIdx].gpu.enumerateDeviceLayerProperties();
-        auto supportedExtensions = gpuInfos[gpuIdx].gpu.enumerateDeviceExtensionProperties();
+        auto profile = gpuProfiles[activeGPUIdx];
+        auto supportedLayers = profile.gpu.enumerateDeviceLayerProperties();
+        auto supportedExtensions = profile.gpu.enumerateDeviceExtensionProperties();
 
         auto queuePriorities = 0.0f;
         auto queueCreateInfos = List<vk::DeviceQueueCreateInfo>();
         auto graphicsQueueCI = vk::DeviceQueueCreateInfo();
-        graphicsQueueCI.queueFamilyIndex = gpuInfos[gpuIdx].graphicsFamilyIdx;
+        graphicsQueueCI.queueFamilyIndex = profile.gfxFamilyIdx;
         graphicsQueueCI.queueCount = 1;
         graphicsQueueCI.pQueuePriorities = &queuePriorities;
         queueCreateInfos.push_back(graphicsQueueCI);
-        if (gpuInfos[gpuIdx].graphicsFamilyIdx != gpuInfos[gpuIdx].presentFamilyIdx) {
+        if (profile.gfxFamilyIdx != profile.presentFamilyIdx) {
             auto presentQueueCI = vk::DeviceQueueCreateInfo();
-            presentQueueCI.queueFamilyIndex = gpuInfos[gpuIdx].presentFamilyIdx;
+            presentQueueCI.queueFamilyIndex = profile.presentFamilyIdx;
             presentQueueCI.queueCount = 1;
             presentQueueCI.pQueuePriorities = &queuePriorities;
             queueCreateInfos.push_back(presentQueueCI);
@@ -232,7 +226,7 @@ namespace Engine::Daedalus
             // Speeds up sequences of draw commands by loading them all and obviating state checks.
             optExtensions.push_back(vk::EXTMultiDrawExtensionName);
             // [Obsolete] This extension enables GPU culling
-            //optionalExtensions.push_back(VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME);
+            //optExtensions.push_back(VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME);
             // This extension may help optimize framebuffer attachments that are also used as inputs.
             // Note: not available on 1 out of 1 nvidia gpus.
             optExtensions.push_back(vk::EXTRasterizationOrderAttachmentAccessExtensionName);
@@ -307,18 +301,39 @@ namespace Engine::Daedalus
                 }
             }
         }
-
-        auto deviceCI = vk::DeviceCreateInfo();
-        deviceCI.queueCreateInfoCount = (u32)queueCreateInfos.size();
-        deviceCI.pQueueCreateInfos = queueCreateInfos.data();
-        deviceCI.enabledLayerCount = (u32)layers.size();
-        deviceCI.ppEnabledLayerNames = layers.data();
-        deviceCI.enabledExtensionCount = (u32)extensions.size();
-        deviceCI.ppEnabledExtensionNames = extensions.data();
-        deviceCI.pEnabledFeatures = &deviceFeatures;
-
-        device = gpuInfos[gpuIdx].gpu.createDevice(deviceCI);
+        
+        // Create Device
+        {
+            auto info = vk::DeviceCreateInfo();
+            info.queueCreateInfoCount = (u32)queueCreateInfos.size();
+            info.pQueueCreateInfos = queueCreateInfos.data();
+            info.enabledLayerCount = (u32)layers.size();
+            info.ppEnabledLayerNames = layers.data();
+            info.enabledExtensionCount = (u32)extensions.size();
+            info.ppEnabledExtensionNames = extensions.data();
+            info.pEnabledFeatures = &deviceFeatures;
+            device = profile.gpu.createDevice(info);
+        }
+        
+        // Create Command Pool
+        {
+            auto info = vk::CommandPoolCreateInfo();
+            info.queueFamilyIndex = profile.dedicatedTfrFamilyIdx;
+        }
 
         return Result::Success;
     }
+
+#if defined(_WINDOWS)
+    Result createSurface(HINSTANCE hInstance, HWND hWnd)
+    {
+        auto createInfo = vk::Win32SurfaceCreateInfoKHR();
+        createInfo.hinstance = hInstance;
+        createInfo.hwnd = hWnd;
+        surface = instance.createWin32SurfaceKHR(createInfo);
+
+        return createDevice();
+    }
+#endif
+
 } // namespace Engine::Daedalus

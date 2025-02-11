@@ -19,3 +19,17 @@ Anticipated:
 - FMOD/Wwise/OpenAL
 - OpenXR
 
+## Style Guide
+
+in-line brackets for if, else, and else if statements. Drop-brackets for everything else.
+Stay within 100 character lines, aim for 80.
+Prefer char16 string literals and types defined in Types.h or stdinc.h 
+
+Class definition structure order:
+1. Types
+2. Statics and consts
+3. All Variables (variables must be private, for direct var access objects use structs)
+4. Getters & Setters
+5. Public interface methods
+6. Private utility methods
+7. *tors and operator overrides.
