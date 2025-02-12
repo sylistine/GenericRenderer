@@ -25,8 +25,9 @@ namespace Engine::Daedalus
     List<GPUProfile> gpuProfiles;
     u32 activeGPUIdx = UINT32_MAX;
     vk::Device device = VK_NULL_HANDLE;
-    vk::CommandPool tfrCmdPool = VK_NULL_HANDLE;
     vk::CommandPool gfxCmdPool = VK_NULL_HANDLE;
+    vk::CommandPool presentCmdPool = VK_NULL_HANDLE;
+    vk::CommandPool tfrCmdPool = VK_NULL_HANDLE;
     vk::DispatchLoaderDynamic loader;
 
     inline bool success(vk::Result res) { return res == vk::Result::eSuccess; }
@@ -99,6 +100,19 @@ namespace Engine::Daedalus
 
     Result terminate()
     {
+        if (gfxCmdPool != VK_NULL_HANDLE) {
+            device.destroyCommandPool(gfxCmdPool);
+            if (presentCmdPool != gfxCmdPool) {
+                device.destroyCommandPool(presentCmdPool);
+            }
+            if (tfrCmdPool != gfxCmdPool) {
+                device.destroyCommandPool(tfrCmdPool);
+            }
+            gfxCmdPool = VK_NULL_HANDLE;
+            presentCmdPool = VK_NULL_HANDLE;
+            tfrCmdPool = VK_NULL_HANDLE;
+        }
+
         if (device != VK_NULL_HANDLE) {
             device.destroy();
         }
@@ -160,7 +174,7 @@ namespace Engine::Daedalus
                         profile.gfxFamilyIdx = i;
                     }
                 }
-                if ((flags & tfrFlag) && !(flags & gfxFlag)) {
+                if ((flags & tfrFlag) && !(flags & gfxFlag) && !(flags & cmpFlag)) {
                     profile.dedicatedTfrFamilyIdx = i;
                 }
             }
@@ -315,10 +329,23 @@ namespace Engine::Daedalus
             device = profile.gpu.createDevice(info);
         }
         
-        // Create Command Pool
+        // Create Command Pools
         {
             auto info = vk::CommandPoolCreateInfo();
-            info.queueFamilyIndex = profile.dedicatedTfrFamilyIdx;
+            info.queueFamilyIndex = profile.gfxFamilyIdx;
+            gfxCmdPool = device.createCommandPool(info);
+            if (profile.presentFamilyIdx != profile.gfxFamilyIdx) {
+                info.queueFamilyIndex = profile.presentFamilyIdx;
+                presentCmdPool = device.createCommandPool(info);
+            } else {
+                presentCmdPool = gfxCmdPool;
+            }
+            if (profile.dedicatedTfrFamilyIdx != UINT32_MAX) {
+                info.queueFamilyIndex = profile.dedicatedTfrFamilyIdx;
+                tfrCmdPool = device.createCommandPool(info);
+            } else {
+                tfrCmdPool = gfxCmdPool;
+            }
         }
 
         return Result::Success;
